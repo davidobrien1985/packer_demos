@@ -1,0 +1,69 @@
+{
+  "variables": {
+    "aws_source_ami": "ami-1af6d779",
+    "aws_instance_type": "t2.micro",
+    "aws_instance_profile": "",
+    "aws_region": "ap-southeast-2",
+    "soe_version": "",
+    "build_number": ""
+  },
+  "builders": [
+    {
+      "ami_name": "windows-server-2016-{{ user `soe_version` }}-{{ user `build_number` }}-{{isotime | clean_ami_name}}",
+      "ami_description": "Autobuild of Windows Server 2016 Full. Build Number: {{ user `build_number` }}",
+      "communicator": "winrm",
+      "iam_instance_profile": "{{ user `aws_instance_profile` }}",
+      "instance_type": "{{ user `aws_instance_type` }}",
+      "region": "{{ user `aws_region` }}",
+      "source_ami": "{{ user `aws_source_ami` }}",
+      "type": "amazon-ebs",
+      "user_data_file": "{{template_dir}}/scripts/user-data.ps1",
+      "windows_password_timeout": "60m",
+      "winrm_insecure": "true",
+      "winrm_port": "5986",
+      "winrm_use_ssl": "true",
+      "winrm_username": "administrator",
+      "run_tags": {
+        "BuildNumber": "{{user `build_number`}}"
+      },
+      "tags": {
+        "BuildNumber": "{{user `build_number`}}",
+        "BuildUUID": "{{user `build_uuid`}}"
+      }
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "powershell",
+      "scripts": [
+        "{{template_dir}}/scripts/create-packer-user.ps1"
+      ]
+    },
+    {
+      "type": "powershell",
+      "elevated_user": "packer",
+      "elevated_password": "@kx0JQSG?uz",
+      "scripts": [
+        "./scripts/Win2016-InstallUpdates.ps1"
+      ]
+    },
+    {
+      "type": "windows-restart",
+      "restart_timeout": "15m"
+    },
+    {
+      "type": "powershell",
+      "scripts": [
+        "{{template_dir}}/scripts/delete-packer-user.ps1",
+        "{{template_dir}}/scripts/EC2LaunchConfig.ps1"
+      ]
+    },
+    {
+      "type": "powershell",
+      "inline": [
+        "C:\\ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule",
+        "C:\\ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\SysprepInstance.ps1"
+      ]
+    }
+  ]
+}
